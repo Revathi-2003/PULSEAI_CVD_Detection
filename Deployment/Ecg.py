@@ -20,53 +20,64 @@ class ECG:
         return os.path.join(self.base_dir, filename)
 
     def getImage(self, image):
-        """Read an image from a path-like (streamlit saved file)"""
-        return imread(image)
+        """
+        this functions gets user image
+        return: user image (numpy array)
+        """
+        # image may be a path string
+        image = imread(image)
+        return image
 
     def GrayImgae(self, image):
-        """Convert to grayscale and resize to canonical size"""
+        """
+        This function converts the user image to Gray Scale
+        return: Gray scale Image
+        """
         image_gray = color.rgb2gray(image)
         image_gray = resize(image_gray, (1572, 2213))
         return image_gray
 
     def DividingLeads(self, image):
-        """Crop the full ECG into 13 lead images and save a preview figure"""
-        # cropping coordinates (tuned to your input format)
+        """
+        Divide ECG image into 13 leads (12 + long lead)
+        returns: list of 13 lead images and also saves two preview PNGs
+        """
         Lead_1 = image[300:600, 150:643]      # Lead 1
-        Lead_2 = image[300:600, 646:1135]     # Lead 2
-        Lead_3 = image[300:600, 1140:1625]    # Lead 3
-        Lead_4 = image[300:600, 1630:2125]    # Lead 4
-        Lead_5 = image[600:900, 150:643]      # Lead 5
-        Lead_6 = image[600:900, 646:1135]     # Lead 6
-        Lead_7 = image[600:900, 1140:1625]    # Lead 7
-        Lead_8 = image[600:900, 1630:2125]    # Lead 8
-        Lead_9 = image[900:1200, 150:643]     # Lead 9
-        Lead_10 = image[900:1200, 646:1135]   # Lead 10
-        Lead_11 = image[900:1200, 1140:1625]  # Lead 11
-        Lead_12 = image[900:1200, 1630:2125]  # Lead 12
+        Lead_2 = image[300:600, 646:1135]     # Lead aVR
+        Lead_3 = image[300:600, 1140:1625]    # Lead V1
+        Lead_4 = image[300:600, 1630:2125]    # Lead V4
+        Lead_5 = image[600:900, 150:643]      # Lead 2
+        Lead_6 = image[600:900, 646:1135]     # Lead aVL
+        Lead_7 = image[600:900, 1140:1625]    # Lead V2
+        Lead_8 = image[600:900, 1630:2125]    # Lead V5
+        Lead_9 = image[900:1200, 150:643]     # Lead 3
+        Lead_10 = image[900:1200, 646:1135]   # Lead aVF
+        Lead_11 = image[900:1200, 1140:1625]  # Lead V3
+        Lead_12 = image[900:1200, 1630:2125]  # Lead V6
         Lead_13 = image[1250:1480, 150:2125]  # Long Lead
 
         Leads = [Lead_1, Lead_2, Lead_3, Lead_4, Lead_5, Lead_6, Lead_7, Lead_8, Lead_9, Lead_10, Lead_11, Lead_12, Lead_13]
 
-        # 12-lead preview figure
+        # create 12-lead preview
         try:
             fig, ax = plt.subplots(4, 3)
             fig.set_size_inches(10, 10)
             x_counter = 0
             y_counter = 0
-            for idx, lead in enumerate(Leads[:12]):
-                ax[x_counter][y_counter].imshow(lead)
+            for x, y in enumerate(Leads[:12]):
+                ax[x_counter][y_counter].imshow(y)
                 ax[x_counter][y_counter].axis('off')
-                ax[x_counter][y_counter].set_title(f"Leads {idx+1}")
-                if (idx+1) % 3 == 0:
+                ax[x_counter][y_counter].set_title(f"Leads {x+1}")
+                if (x+1) % 3 == 0:
                     x_counter += 1
                     y_counter = 0
                 else:
                     y_counter += 1
-            fig.savefig(self._path('Leads_1-12_figure.png'))
+
+            leads12_path = self._path('Leads_1-12_figure.png')
+            fig.savefig(leads12_path)
             plt.close(fig)
         except Exception:
-            # keep going if preview generation fails
             try:
                 plt.close('all')
             except Exception:
@@ -77,8 +88,10 @@ class ECG:
             fig1, ax1 = plt.subplots()
             fig1.set_size_inches(10, 10)
             ax1.imshow(Lead_13)
+            ax1.set_title("Leads 13")
             ax1.axis('off')
-            fig1.savefig(self._path('Long_Lead_13_figure.png'))
+            longlead_path = self._path('Long_Lead_13_figure.png')
+            fig1.savefig(longlead_path)
             plt.close(fig1)
         except Exception:
             try:
@@ -89,14 +102,17 @@ class ECG:
         return Leads
 
     def PreprocessingLeads(self, Leads):
-        """Preprocess each of the 12 leads for contour extraction and save previews"""
+        """
+        Preprocess each extracted lead and save preview images
+        """
         try:
             fig2, ax2 = plt.subplots(4, 3)
             fig2.set_size_inches(10, 10)
             x_counter = 0
             y_counter = 0
-            for idx, lead in enumerate(Leads[:12]):
-                grayscale = color.rgb2gray(lead)
+
+            for x, y in enumerate(Leads[:12]):
+                grayscale = color.rgb2gray(y)
                 blurred_image = gaussian(grayscale, sigma=1)
                 global_thresh = threshold_otsu(blurred_image)
                 binary_global = blurred_image < global_thresh
@@ -104,14 +120,15 @@ class ECG:
 
                 ax2[x_counter][y_counter].imshow(binary_global, cmap="gray")
                 ax2[x_counter][y_counter].axis('off')
-                ax2[x_counter][y_counter].set_title(f"pre-processed Leads {idx+1} image")
-                if (idx+1) % 3 == 0:
+                ax2[x_counter][y_counter].set_title(f"pre-processed Leads {x+1} image")
+                if (x+1) % 3 == 0:
                     x_counter += 1
                     y_counter = 0
                 else:
                     y_counter += 1
 
-            fig2.savefig(self._path('Preprossed_Leads_1-12_figure.png'))
+            pre12_path = self._path('Preprossed_Leads_1-12_figure.png')
+            fig2.savefig(pre12_path)
             plt.close(fig2)
         except Exception:
             try:
@@ -119,7 +136,7 @@ class ECG:
             except Exception:
                 pass
 
-        # long lead preprocessed preview
+        # lead 13
         try:
             fig3, ax3 = plt.subplots()
             fig3.set_size_inches(10, 10)
@@ -128,8 +145,10 @@ class ECG:
             global_thresh = threshold_otsu(blurred_image)
             binary_global = blurred_image < global_thresh
             ax3.imshow(binary_global, cmap='gray')
+            ax3.set_title("Leads 13")
             ax3.axis('off')
-            fig3.savefig(self._path('Preprossed_Leads_13_figure.png'))
+            pre13_path = self._path('Preprossed_Leads_13_figure.png')
+            fig3.savefig(pre13_path)
             plt.close(fig3)
         except Exception:
             try:
@@ -138,8 +157,10 @@ class ECG:
                 pass
 
     def SignalExtraction_Scaling(self, Leads):
-        """Find contours on each lead, scale to [0,1], and save as Scaled_1DLead_X.csv"""
-        # remove previous CSVs to avoid accumulation or collisions
+        """
+        Extract contours from each lead and save scaled 1D CSVs in the deployment folder.
+        """
+        # DELETE previous CSVs (fix infinite looping)
         try:
             for f in os.listdir(self.base_dir):
                 if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
@@ -154,38 +175,42 @@ class ECG:
             fig4, ax4 = plt.subplots(4, 3)
             x_counter = 0
             y_counter = 0
-            for idx, lead in enumerate(Leads[:12]):
-                grayscale = color.rgb2gray(lead)
+
+            for x, y in enumerate(Leads[:12]):
+                grayscale = color.rgb2gray(y)
                 blurred_image = gaussian(grayscale, sigma=0.7)
                 global_thresh = threshold_otsu(blurred_image)
                 binary_global = blurred_image < global_thresh
                 binary_global = resize(binary_global, (300, 450))
                 contours = measure.find_contours(binary_global, 0.8)
                 if not contours:
-                    # skip this lead if no contour found
+                    # if no contour found, skip saving and continue
                     continue
 
-                # choose the longest contour
+                # pick the biggest contour by length
                 contour = sorted(contours, key=lambda c: c.shape[0], reverse=True)[0]
-                contour = resize(contour, (255, 2))
+                contour_resized = resize(contour, (255, 2))
 
                 ax4[x_counter][y_counter].invert_yaxis()
-                ax4[x_counter][y_counter].plot(contour[:, 1], contour[:, 0], linewidth=1)
+                ax4[x_counter][y_counter].plot(contour_resized[:, 1], contour_resized[:, 0], linewidth=1)
                 ax4[x_counter][y_counter].axis('image')
-                ax4[x_counter][y_counter].set_title(f"Contour {idx+1} image")
-                if (idx+1) % 3 == 0:
+                ax4[x_counter][y_counter].set_title(f"Contour {x+1} image")
+                if (x+1) % 3 == 0:
                     x_counter += 1
                     y_counter = 0
                 else:
                     y_counter += 1
 
-                # scale and save as single-row CSV (one lead per column when combined)
+                # scaling and saving as CSV (one row)
                 scaler = MinMaxScaler()
-                scaled = scaler.fit_transform(contour)
-                df = pd.DataFrame(scaled[:, 0]).T
-                csv_filename = f"Scaled_1DLead_{idx+1}.csv"
-                df.to_csv(self._path(csv_filename), index=False)
-            fig4.savefig(self._path('Contour_Leads_1-12_figure.png'))
+                fit_transform_data = scaler.fit_transform(contour_resized)
+                Normalized_Scaled = pd.DataFrame(fit_transform_data[:, 0], columns=['X']).T
+                csv_filename = f"Scaled_1DLead_{x+1}.csv"
+                csv_path = self._path(csv_filename)
+                Normalized_Scaled.to_csv(csv_path, index=False)
+
+            contour_fig_path = self._path('Contour_Leads_1-12_figure.png')
+            fig4.savefig(contour_fig_path)
             plt.close(fig4)
         except Exception:
             try:
@@ -194,33 +219,45 @@ class ECG:
                 pass
 
     def CombineConvert1Dsignal(self):
-        """Combine Scaled_1DLead_*.csv files into a single dataframe (ordered by lead index)"""
-        files = [f for f in natsorted(os.listdir(self.base_dir)) if f.startswith("Scaled_1DLead_") and f.endswith(".csv")]
+        """
+        Combines all Scaled_1DLead_*.csv into a single DataFrame in the same order (1..12).
+        returns the final dataframe
+        """
+        files = [f for f in natsorted(os.listdir(self.base_dir)) if f.startswith('Scaled_1DLead_') and f.endswith('.csv')]
         if not files:
-            raise FileNotFoundError("No Scaled_1DLead_*.csv files found. Signal extraction may have failed.")
-        dfs = []
-        for f in files:
-            dfs.append(pd.read_csv(self._path(f)))
-        final_df = pd.concat(dfs, axis=1, ignore_index=True)
-        return final_df
+            raise FileNotFoundError("No Scaled_1DLead_*.csv files found. SignalExtraction_Scaling may have failed.")
+
+        dfs = [pd.read_csv(self._path(f)) for f in files]
+        test_final = pd.concat(dfs, axis=1, ignore_index=True)
+        return test_final
 
     def DimensionalReduciton(self, test_final):
-        """Load PCA model and transform features"""
-        model_path = self._path("PCA_ECG.pkl")
+        """
+        Use saved PCA model to reduce dims
+        """
+        model_filename = 'PCA_ECG.pkl'
+        model_path = self._path(model_filename)
+
         if not os.path.isfile(model_path):
-            raise FileNotFoundError(f"PCA model not found at: {model_path}")
-        pca = joblib.load(model_path)
-        result = pca.transform(test_final)
-        return pd.DataFrame(result)
+            raise FileNotFoundError(f"PCA model not found at: {model_path}. Please add PCA_ECG.pkl to the deployment folder.")
+
+        pca_loaded_model = joblib.load(model_path)
+        result = pca_loaded_model.transform(test_final)
+        final_df = pd.DataFrame(result)
+        return final_df
 
     def ModelLoad_predict(self, final_df):
-        """Load classifier and predict"""
-        model_path = self._path("Heart_Disease_Prediction_using_ECG.pkl")
+        """
+        Load pretrained classifier and predict
+        """
+        model_filename = 'Heart_Disease_Prediction_using_ECG.pkl'
+        model_path = self._path(model_filename)
+
         if not os.path.isfile(model_path):
-            raise FileNotFoundError(f"Classifier model not found at: {model_path}")
+            raise FileNotFoundError(f"Classifier model not found at: {model_path}. Please add Heart_Disease_Prediction_using_ECG.pkl to the deployment folder.")
+
         model = joblib.load(model_path)
         result = model.predict(final_df)
-        # map numeric to messages (keep same mapping as before)
         if result[0] == 1:
             return "You ECG corresponds to Myocardial Infarction"
         elif result[0] == 0:

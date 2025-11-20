@@ -12,168 +12,220 @@ from natsort import natsorted
 
 class ECG:
     def __init__(self):
-        # this file usually lives in Deployment/; base_dir will be that folder
+        # base directory where this file lives (Deployment/)
         self.base_dir = os.path.dirname(__file__)
 
     def _path(self, filename):
+        """Return absolute path inside the deployment folder"""
         return os.path.join(self.base_dir, filename)
 
     def getImage(self, image):
-        # image is a path
+        """Read an image from a path-like (streamlit saved file)"""
         return imread(image)
 
     def GrayImgae(self, image):
+        """Convert to grayscale and resize to canonical size"""
         image_gray = color.rgb2gray(image)
         image_gray = resize(image_gray, (1572, 2213))
         return image_gray
 
     def DividingLeads(self, image):
-        # crop coordinates (kept as before)
-        Lead_1 = image[300:600, 150:643]
-        Lead_2 = image[300:600, 646:1135]
-        Lead_3 = image[300:600, 1140:1625]
-        Lead_4 = image[300:600, 1630:2125]
-        Lead_5 = image[600:900, 150:643]
-        Lead_6 = image[600:900, 646:1135]
-        Lead_7 = image[600:900, 1140:1625]
-        Lead_8 = image[600:900, 1630:2125]
-        Lead_9 = image[900:1200, 150:643]
-        Lead_10 = image[900:1200, 646:1135]
-        Lead_11 = image[900:1200, 1140:1625]
-        Lead_12 = image[900:1200, 1630:2125]
-        Lead_13 = image[1250:1480, 150:2125]
+        """Crop the full ECG into 13 lead images and save a preview figure"""
+        # cropping coordinates (tuned to your input format)
+        Lead_1 = image[300:600, 150:643]      # Lead 1
+        Lead_2 = image[300:600, 646:1135]     # Lead 2
+        Lead_3 = image[300:600, 1140:1625]    # Lead 3
+        Lead_4 = image[300:600, 1630:2125]    # Lead 4
+        Lead_5 = image[600:900, 150:643]      # Lead 5
+        Lead_6 = image[600:900, 646:1135]     # Lead 6
+        Lead_7 = image[600:900, 1140:1625]    # Lead 7
+        Lead_8 = image[600:900, 1630:2125]    # Lead 8
+        Lead_9 = image[900:1200, 150:643]     # Lead 9
+        Lead_10 = image[900:1200, 646:1135]   # Lead 10
+        Lead_11 = image[900:1200, 1140:1625]  # Lead 11
+        Lead_12 = image[900:1200, 1630:2125]  # Lead 12
+        Lead_13 = image[1250:1480, 150:2125]  # Long Lead
 
-        Leads = [Lead_1, Lead_2, Lead_3, Lead_4, Lead_5,
-                 Lead_6, Lead_7, Lead_8, Lead_9, Lead_10,
-                 Lead_11, Lead_12, Lead_13]
+        Leads = [Lead_1, Lead_2, Lead_3, Lead_4, Lead_5, Lead_6, Lead_7, Lead_8, Lead_9, Lead_10, Lead_11, Lead_12, Lead_13]
 
-        # save 12-lead preview to base_dir
+        # 12-lead preview figure
         try:
-            fig, ax = plt.subplots(4,3); fig.set_size_inches(10,10)
-            x,y = 0,0
-            for i, lead in enumerate(Leads[:12]):
-                ax[x][y].imshow(lead); ax[x][y].axis('off')
-                ax[x][y].set_title(f"Leads {i+1}")
-                if (i+1)%3==0: x+=1; y=0
-                else: y+=1
-            fig.savefig(self._path("Leads_1-12_figure.png"))
+            fig, ax = plt.subplots(4, 3)
+            fig.set_size_inches(10, 10)
+            x_counter = 0
+            y_counter = 0
+            for idx, lead in enumerate(Leads[:12]):
+                ax[x_counter][y_counter].imshow(lead)
+                ax[x_counter][y_counter].axis('off')
+                ax[x_counter][y_counter].set_title(f"Leads {idx+1}")
+                if (idx+1) % 3 == 0:
+                    x_counter += 1
+                    y_counter = 0
+                else:
+                    y_counter += 1
+            fig.savefig(self._path('Leads_1-12_figure.png'))
             plt.close(fig)
         except Exception:
-            # do not fail if preview generation fails; just continue
-            try: plt.close('all')
-            except Exception: pass
+            # keep going if preview generation fails
+            try:
+                plt.close('all')
+            except Exception:
+                pass
 
         # long lead preview
         try:
-            fig2, ax2 = plt.subplots(); fig2.set_size_inches(10,10)
-            ax2.imshow(Leads[-1]); ax2.axis('off')
-            fig2.savefig(self._path("Long_Lead_13_figure.png")); plt.close(fig2)
+            fig1, ax1 = plt.subplots()
+            fig1.set_size_inches(10, 10)
+            ax1.imshow(Lead_13)
+            ax1.axis('off')
+            fig1.savefig(self._path('Long_Lead_13_figure.png'))
+            plt.close(fig1)
         except Exception:
-            try: plt.close('all')
-            except Exception: pass
+            try:
+                plt.close('all')
+            except Exception:
+                pass
 
         return Leads
 
     def PreprocessingLeads(self, Leads):
+        """Preprocess each of the 12 leads for contour extraction and save previews"""
         try:
-            fig, ax = plt.subplots(4,3); fig.set_size_inches(10,10)
-            x,y = 0,0
-            for i, lead in enumerate(Leads[:12]):
-                gray = color.rgb2gray(lead)
-                blur = gaussian(gray, sigma=1)
-                thr = threshold_otsu(blur)
-                binary = resize(blur < thr, (300,450))
-                ax[x][y].imshow(binary, cmap='gray'); ax[x][y].axis('off')
-                ax[x][y].set_title(f"pre-processed Leads {i+1}")
-                if (i+1)%3==0: x+=1; y=0
-                else: y+=1
-            fig.savefig(self._path("Preprossed_Leads_1-12_figure.png")); plt.close(fig)
-        except Exception:
-            try: plt.close('all')
-            except Exception: pass
+            fig2, ax2 = plt.subplots(4, 3)
+            fig2.set_size_inches(10, 10)
+            x_counter = 0
+            y_counter = 0
+            for idx, lead in enumerate(Leads[:12]):
+                grayscale = color.rgb2gray(lead)
+                blurred_image = gaussian(grayscale, sigma=1)
+                global_thresh = threshold_otsu(blurred_image)
+                binary_global = blurred_image < global_thresh
+                binary_global = resize(binary_global, (300, 450))
 
-        try:
-            fig2, ax2 = plt.subplots(); fig2.set_size_inches(10,10)
-            gray = color.rgb2gray(Leads[-1]); blur = gaussian(gray, sigma=1)
-            thr = threshold_otsu(blur)
-            ax2.imshow(blur < thr, cmap='gray'); ax2.axis('off')
-            fig2.savefig(self._path("Preprossed_Leads_13_figure.png")); plt.close(fig2)
+                ax2[x_counter][y_counter].imshow(binary_global, cmap="gray")
+                ax2[x_counter][y_counter].axis('off')
+                ax2[x_counter][y_counter].set_title(f"pre-processed Leads {idx+1} image")
+                if (idx+1) % 3 == 0:
+                    x_counter += 1
+                    y_counter = 0
+                else:
+                    y_counter += 1
+
+            fig2.savefig(self._path('Preprossed_Leads_1-12_figure.png'))
+            plt.close(fig2)
         except Exception:
-            try: plt.close('all')
-            except Exception: pass
+            try:
+                plt.close('all')
+            except Exception:
+                pass
+
+        # long lead preprocessed preview
+        try:
+            fig3, ax3 = plt.subplots()
+            fig3.set_size_inches(10, 10)
+            grayscale = color.rgb2gray(Leads[-1])
+            blurred_image = gaussian(grayscale, sigma=1)
+            global_thresh = threshold_otsu(blurred_image)
+            binary_global = blurred_image < global_thresh
+            ax3.imshow(binary_global, cmap='gray')
+            ax3.axis('off')
+            fig3.savefig(self._path('Preprossed_Leads_13_figure.png'))
+            plt.close(fig3)
+        except Exception:
+            try:
+                plt.close('all')
+            except Exception:
+                pass
 
     def SignalExtraction_Scaling(self, Leads):
-        # delete previous CSVs created in base_dir to avoid stale data
-        for f in os.listdir(self.base_dir):
-            if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
-                try: os.remove(self._path(f))
-                except Exception: pass
-
-        fig, ax = plt.subplots(4,3); x,y = 0,0
-        produced_any = False
-        for i, lead in enumerate(Leads[:12]):
-            try:
-                gray = color.rgb2gray(lead)
-                blur = gaussian(gray, 0.7)
-                thr = threshold_otsu(blur)
-                binary = resize(blur < thr, (300,450))
-                conts = measure.find_contours(binary, 0.8)
-                if not conts:
-                    continue
-                cont = sorted(conts, key=lambda c: c.shape[0], reverse=True)[0]
-                cont = resize(cont, (255,2))
-
-                ax[x][y].invert_yaxis()
-                ax[x][y].plot(cont[:,1], cont[:,0], linewidth=1)
-                ax[x][y].set_title(f"Contour {i+1}")
-                ax[x][y].axis("off")
-                if (i+1)%3==0: x+=1; y=0
-                else: y+=1
-
-                scaler = MinMaxScaler()
-                scaled = scaler.fit_transform(cont)
-                df = pd.DataFrame(scaled[:,0]).T
-                df.to_csv(self._path(f"Scaled_1DLead_{i+1}.csv"), index=False)
-                produced_any = True
-            except Exception:
-                # skip problematic leads but continue
-                continue
+        """Find contours on each lead, scale to [0,1], and save as Scaled_1DLead_X.csv"""
+        # remove previous CSVs to avoid accumulation or collisions
+        try:
+            for f in os.listdir(self.base_dir):
+                if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
+                    try:
+                        os.remove(self._path(f))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         try:
-            fig.savefig(self._path("Contour_Leads_1-12_figure.png")); plt.close(fig)
-        except Exception:
-            try: plt.close('all')
-            except Exception: pass
+            fig4, ax4 = plt.subplots(4, 3)
+            x_counter = 0
+            y_counter = 0
+            for idx, lead in enumerate(Leads[:12]):
+                grayscale = color.rgb2gray(lead)
+                blurred_image = gaussian(grayscale, sigma=0.7)
+                global_thresh = threshold_otsu(blurred_image)
+                binary_global = blurred_image < global_thresh
+                binary_global = resize(binary_global, (300, 450))
+                contours = measure.find_contours(binary_global, 0.8)
+                if not contours:
+                    # skip this lead if no contour found
+                    continue
 
-        # if no CSV produced at all, raise so caller can handle it
-        if not produced_any:
-            raise RuntimeError("No contours/CSV produced by SignalExtraction_Scaling; check input image or thresholds.")
+                # choose the longest contour
+                contour = sorted(contours, key=lambda c: c.shape[0], reverse=True)[0]
+                contour = resize(contour, (255, 2))
+
+                ax4[x_counter][y_counter].invert_yaxis()
+                ax4[x_counter][y_counter].plot(contour[:, 1], contour[:, 0], linewidth=1)
+                ax4[x_counter][y_counter].axis('image')
+                ax4[x_counter][y_counter].set_title(f"Contour {idx+1} image")
+                if (idx+1) % 3 == 0:
+                    x_counter += 1
+                    y_counter = 0
+                else:
+                    y_counter += 1
+
+                # scale and save as single-row CSV (one lead per column when combined)
+                scaler = MinMaxScaler()
+                scaled = scaler.fit_transform(contour)
+                df = pd.DataFrame(scaled[:, 0]).T
+                csv_filename = f"Scaled_1DLead_{idx+1}.csv"
+                df.to_csv(self._path(csv_filename), index=False)
+            fig4.savefig(self._path('Contour_Leads_1-12_figure.png'))
+            plt.close(fig4)
+        except Exception:
+            try:
+                plt.close('all')
+            except Exception:
+                pass
 
     def CombineConvert1Dsignal(self):
+        """Combine Scaled_1DLead_*.csv files into a single dataframe (ordered by lead index)"""
         files = [f for f in natsorted(os.listdir(self.base_dir)) if f.startswith("Scaled_1DLead_") and f.endswith(".csv")]
         if not files:
-            raise FileNotFoundError("No Scaled_1DLead_*.csv files found. SignalExtraction_Scaling may have failed.")
-        dfs = [pd.read_csv(self._path(f)) for f in files]
+            raise FileNotFoundError("No Scaled_1DLead_*.csv files found. Signal extraction may have failed.")
+        dfs = []
+        for f in files:
+            dfs.append(pd.read_csv(self._path(f)))
         final_df = pd.concat(dfs, axis=1, ignore_index=True)
         return final_df
 
     def DimensionalReduciton(self, test_final):
-        pca_path = self._path("PCA_ECG.pkl")
-        if not os.path.isfile(pca_path):
-            raise FileNotFoundError(f"PCA model missing at {pca_path}")
-        pca = joblib.load(pca_path)
+        """Load PCA model and transform features"""
+        model_path = self._path("PCA_ECG.pkl")
+        if not os.path.isfile(model_path):
+            raise FileNotFoundError(f"PCA model not found at: {model_path}")
+        pca = joblib.load(model_path)
         result = pca.transform(test_final)
         return pd.DataFrame(result)
 
     def ModelLoad_predict(self, final_df):
+        """Load classifier and predict"""
         model_path = self._path("Heart_Disease_Prediction_using_ECG.pkl")
         if not os.path.isfile(model_path):
-            raise FileNotFoundError(f"Classifier model missing at {model_path}")
+            raise FileNotFoundError(f"Classifier model not found at: {model_path}")
         model = joblib.load(model_path)
         result = model.predict(final_df)
-        return (
-            "You ECG corresponds to Myocardial Infarction" if result[0] == 1 else
-            "You ECG corresponds to Abnormal Heartbeat" if result[0] == 0 else
-            "Your ECG is Normal" if result[0] == 2 else
-            "You ECG corresponds to History of Myocardial Infarction"
-        )
+        # map numeric to messages (keep same mapping as before)
+        if result[0] == 1:
+            return "You ECG corresponds to Myocardial Infarction"
+        elif result[0] == 0:
+            return "You ECG corresponds to Abnormal Heartbeat"
+        elif result[0] == 2:
+            return "Your ECG is Normal"
+        else:
+            return "You ECG corresponds to History of Myocardial Infarction"

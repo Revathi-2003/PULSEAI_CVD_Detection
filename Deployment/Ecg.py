@@ -15,7 +15,6 @@ class ECG:
         self.base_dir = os.path.dirname(__file__)
 
     def _path(self, filename):
-        """Load files from same Deployment folder"""
         return os.path.join(self.base_dir, filename)
 
     def getImage(self, image):
@@ -86,8 +85,11 @@ class ECG:
     def SignalExtraction_Scaling(self, Leads):
         # DELETE previous CSVs (fix infinite looping)
         for f in os.listdir(self.base_dir):
-            if f.startswith("Scaled_1DLead_"):
-                os.remove(self._path(f))
+            if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
+                try:
+                    os.remove(self._path(f))
+                except Exception:
+                    pass
 
         fig, ax = plt.subplots(4,3); x,y = 0,0
         for i, lead in enumerate(Leads[:12]):
@@ -95,8 +97,11 @@ class ECG:
             blur = gaussian(gray, 0.7)
             thr = threshold_otsu(blur)
             binary = resize(blur < thr, (300,450))
-            cont = measure.find_contours(binary, 0.8)
-            cont = sorted(cont, key=lambda c: c.shape[0], reverse=True)[0]
+            conts = measure.find_contours(binary, 0.8)
+            if not conts:
+                # skip if no contours found for this lead
+                continue
+            cont = sorted(conts, key=lambda c: c.shape[0], reverse=True)[0]
             cont = resize(cont, (255,2))
 
             ax[x][y].invert_yaxis()
@@ -115,7 +120,10 @@ class ECG:
 
     def CombineConvert1Dsignal(self):
         files = [f for f in natsorted(os.listdir(self.base_dir))
-                 if f.startswith("Scaled_1DLead_")]
+                 if f.startswith("Scaled_1DLead_") and f.endswith(".csv")]
+
+        if not files:
+            raise FileNotFoundError("No Scaled_1DLead_*.csv files found. SignalExtraction_Scaling may have failed.")
 
         dfs = [pd.read_csv(self._path(f)) for f in files]
         final_df = pd.concat(dfs, axis=1, ignore_index=True)
@@ -123,12 +131,16 @@ class ECG:
 
     def DimensionalReduciton(self, test_final):
         pca_path = self._path("PCA_ECG.pkl")
+        if not os.path.isfile(pca_path):
+            raise FileNotFoundError(f"PCA model missing at {pca_path}")
         pca = joblib.load(pca_path)
         result = pca.transform(test_final)
         return pd.DataFrame(result)
 
     def ModelLoad_predict(self, final_df):
         model_path = self._path("Heart_Disease_Prediction_using_ECG.pkl")
+        if not os.path.isfile(model_path):
+            raise FileNotFoundError(f"Classifier model missing at {model_path}")
         model = joblib.load(model_path)
         result = model.predict(final_df)
         return (

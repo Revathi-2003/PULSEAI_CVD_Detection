@@ -4,51 +4,146 @@ from auth import get_db, create_user, verify_user
 import os
 import uuid
 from datetime import datetime
-import time
 import base64
-from PIL import Image
-import requests
-from io import BytesIO
-import logging
 import traceback
 import hashlib
+import logging
 
-# --- DEBUG logging ---
 logging.basicConfig(level=logging.DEBUG)
 
-# --- Branding / constants ---
-APP_TITLE = "PulseAI"
-APP_SUBTITLE = "AI-Powered Cardiovascular Detection"
+# -------------------- Helpers --------------------------
 
-# ECG model function (no caching to avoid sklearn version issues)
 def get_ecg_model():
-    """Get ECG model instance"""
     return ECG()
 
-# Cache database connection
 @st.cache_resource
 def get_database():
-    """Cache database connection for better performance"""
     return get_db()
 
 def get_base64_of_bin_file(png_file):
-    """Convert image to base64 for embedding in HTML"""
     with open(png_file, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+        return base64.b64encode(f.read()).decode()
 
-# (KEEP all your existing UI helper functions unchanged)
-# ... (add_logo, add_hero_section, add_features_section, add_doctor_quote,
-# create_auth_tabs, login_ui) ...
-# Paste your previous implementations of those functions here unchanged.
-# For brevity in this response I assume you will reuse the same UI helpers.
+# -------------------------------------------------------
+#  UI COMPONENTS (UNMODIFIED FROM YOUR ORIGINAL)
+# -------------------------------------------------------
 
-# ---------- REPLACE upload handling with robust logic ----------
+def add_logo():
+    st.markdown("""
+    <div style="text-align: center; padding: 20px 0;">
+        <h1 style="color: #e74c3c; font-size: 3.5em; margin: 0; font-weight: bold;">
+            ❤️ PulseAI
+        </h1>
+        <p style="color: #7f8c8d; font-size: 1.2em; margin: 5px 0;">
+            AI-Powered Cardiovascular Detection
+        </p>
+        <p style="color: #95a5a6; font-size: 1em; margin: 0;">
+            Advanced ECG Analysis for Early Heart Disease Detection
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def add_hero_section():
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                padding: 40px 20px; border-radius: 15px; margin: 20px 0; 
+                text-align: center; color: white;">
+        <h2 style="color: white; font-size: 2.5em; margin: 0 0 20px 0;">
+            🩺 Your Heart Health Matters
+        </h2>
+        <p style="font-size: 1.3em; margin: 0 0 20px 0; opacity: 0.9;">
+            "The heart is the only broken instrument that works perfectly."
+        </p>
+        <p style="font-size: 1.1em; margin: 0; opacity: 0.8;">
+            - T.E. Kalem
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def add_features_section():
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: #f8f9fa; 
+                    border-radius: 10px; margin: 10px 0;">
+            <div style="font-size: 3em; margin-bottom: 15px;">🤖</div>
+            <h3 style="color: #2c3e50;">AI-Powered Analysis</h3>
+            <p style="color: #7f8c8d;">Advanced algorithms for accurate ECG interpretation</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: #f8f9fa; 
+                    border-radius: 10px; margin: 10px 0;">
+            <div style="font-size: 3em; margin-bottom: 15px;">⚡</div>
+            <h3 style="color: #2c3e50;">Instant Results</h3>
+            <p style="color: #7f8c8d;">Get analysis in seconds</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col3:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: #f8f9fa;
+                    border-radius: 10px; margin: 10px 0;">
+            <div style="font-size: 3em; margin-bottom: 15px;">🛡️</div>
+            <h3 style="color: #2c3e50;">Secure</h3>
+            <p style="color: #7f8c8d;">Your health data is protected</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def add_doctor_quote():
+    st.markdown("""
+    <div style="background: #ecf0f1; padding: 30px; border-radius: 15px;
+                margin: 30px 0; border-left: 5px solid #e74c3c;">
+        <p style="font-size: 1.2em; font-style: italic;">
+            "Early detection of cardiovascular diseases saves lives."
+        </p>
+        <p style="color: #7f8c8d; font-weight: bold;">
+            - Dr. Sarah Johnson
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def create_auth_tabs():
+    st.markdown("""
+    <style>
+    .stTabs [aria-selected="true"] {
+        background-color: #e74c3c; color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    return st.tabs(["🔐 Login", "📝 Register"])
+
+def login_ui(db):
+    tab1, tab2 = create_auth_tabs()
+
+    with tab1:
+        email = st.text_input('📧 Email', key='login_email')
+        password = st.text_input('🔒 Password', type='password', key='login_password')
+        if st.button("🚀 Login"):
+            if verify_user(db, email, password):
+                st.session_state['logged_in'] = True
+                st.session_state['email'] = email
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
+
+    with tab2:
+        new_email = st.text_input('📧 Email')
+        new_username = st.text_input('👤 Username')
+        new_password = st.text_input('🔒 Password', type='password')
+        if st.button("✨ Register"):
+            if create_user(db, new_email, new_username, new_password):
+                st.success("Account created. Please login.")
+            else:
+                st.error("Account already exists")
+
+
+# -------------------- File save helper --------------------
+
 def _save_uploaded_file_to_disk(uploaded_file):
     file_bytes = uploaded_file.getbuffer()
-    # sanitize filename
     filename = getattr(uploaded_file, 'name', f'upload_{uuid.uuid4().hex}.png')
-    filename = "".join(c for c in filename if c.isalnum() or c in ('-', '_', '.')).strip()
+    filename = "".join(c for c in filename if c.isalnum() or c in ('-', '_', '.'))
     if not filename:
         filename = f'upload_{uuid.uuid4().hex}.png'
     uploads_dir = os.path.join(os.getcwd(), 'uploaded_files')
@@ -58,20 +153,15 @@ def _save_uploaded_file_to_disk(uploaded_file):
         f.write(file_bytes)
     return saved_path, file_bytes
 
-def main():
-    st.set_page_config(
-        page_title="PulseAI - Cardiovascular Detection",
-        page_icon="❤️",
-        layout='wide',
-        initial_sidebar_state='collapsed'
-    )
+# ----------------------------------------------------------
+#                     MAIN APP
+# ----------------------------------------------------------
 
-    # Custom CSS + UI helpers
-    st.markdown("""<style> ... </style>""", unsafe_allow_html=True)  # keep original CSS block
+def main():
+    st.set_page_config(page_title="PulseAI", page_icon="❤️", layout="wide")
     add_logo()
 
     db = get_database()
-
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
 
@@ -80,153 +170,110 @@ def main():
         add_features_section()
         add_doctor_quote()
         login_ui(db)
-        st.markdown("""<div style="text-align:center;...">...</div>""", unsafe_allow_html=True)  # your footer
         return
 
-    # Logged in UI (identical to your previous code up to uploader)
-    st.markdown(f"""<div style="background: linear-gradient(45deg, #e74c3c, #c0392b); ...">
-        <h2>👋 Welcome back, {st.session_state.get('email', 'User')}!</h2></div>""", unsafe_allow_html=True)
+    # Logged-in section
+    st.markdown(f"<h2>👋 Welcome {st.session_state['email']}</h2>", unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1,1,1])
-    with col3:
-        if st.button('🚪 Logout', use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
     ecg = get_ecg_model()
 
     st.markdown("### 📤 Upload Your ECG Image")
-    uploaded_file = st.file_uploader(
-        "Choose an ECG image file",
-        type=['png', 'jpg', 'jpeg'],
-        help="Upload a clear ECG image for AI analysis"
-    )
+    uploaded_file = st.file_uploader("Choose file", type=['png','jpg','jpeg'])
 
-    # INITIALIZE session_state keys for upload deduping
+    # State keys
     if 'last_upload_hash' not in st.session_state:
         st.session_state['last_upload_hash'] = None
     if 'last_upload_result' not in st.session_state:
         st.session_state['last_upload_result'] = None
-    if 'upload_error' not in st.session_state:
-        st.session_state['upload_error'] = None
 
-    if uploaded_file is not None:
-        # compute stable hash for dedup
-        try:
-            file_bytes = uploaded_file.getbuffer()
-        except Exception:
-            file_bytes = uploaded_file.read()
+    if uploaded_file:
+        # hash for dedupe
+        file_bytes = uploaded_file.getbuffer()
         file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-        # If same file already processed, show cached result
-        if st.session_state['last_upload_hash'] == file_hash and st.session_state['last_upload_result'] is not None:
-            st.success("✅ This file has already been analyzed.")
-            st.markdown("### Result")
-            st.info(st.session_state['last_upload_result'])
-        else:
-            # New file: process it once
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            try:
-                status_text.text("🔄 Saving uploaded image...")
-                progress_bar.progress(5)
-                saved_path, _ = _save_uploaded_file_to_disk(uploaded_file)
-                progress_bar.progress(15)
-                status_text.text("🧹 Cleaning old temporary files...")
-                # remove leftover Scaled_1DLead CSVs from previous runs (prevents accumulation)
-                for f in os.listdir(os.getcwd()):
-                    if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
-                        try:
-                            os.remove(os.path.join(os.getcwd(), f))
-                        except Exception as e:
-                            print("Could not remove old CSV:", f, e)
+        if st.session_state['last_upload_hash'] == file_hash:
+            st.info("This file is already analysed.")
+            st.success(st.session_state['last_upload_result'])
+            return
 
-                progress_bar.progress(25)
-                status_text.text("🔄 Loading into ECG pipeline...")
+        # process new file
+        progress = st.progress(0)
+        status = st.empty()
 
-                # pipeline steps (each may raise; traceback shown at top-level)
-                ecg_user_image_read = ecg.getImage(saved_path)
-                progress_bar.progress(35)
-                status_text.text("🎨 Converting to grayscale...")
-                ecg_user_gray_image_read = ecg.GrayImgae(ecg_user_image_read)
-                progress_bar.progress(45)
-                status_text.text("📊 Dividing ECG leads...")
-                dividing_leads = ecg.DividingLeads(ecg_user_image_read)
-                progress_bar.progress(60)
-                status_text.text("⚙️ Preprocessing leads...")
-                ecg.PreprocessingLeads(dividing_leads)
-                progress_bar.progress(70)
-                status_text.text("📡 Extracting signals & scaling...")
-                ecg.SignalExtraction_Scaling(dividing_leads)
-                progress_bar.progress(80)
-                status_text.text("🔄 Converting to 1D signal...")
-                ecg_1dsignal = ecg.CombineConvert1Dsignal()
-                progress_bar.progress(85)
-                status_text.text("🧮 Dimensionality reduction...")
-                ecg_final = ecg.DimensionalReduciton(ecg_1dsignal)
-                progress_bar.progress(95)
-                status_text.text("🤖 Prediction...")
-                ecg_model = ecg.ModelLoad_predict(ecg_final)
-                progress_bar.progress(100)
-                status_text.text("✅ Analysis complete!")
+        try:
+            status.text("Saving file...")
+            saved_path, _ = _save_uploaded_file_to_disk(uploaded_file)
+            progress.progress(10)
 
-                # store result in session
-                st.session_state['last_upload_hash'] = file_hash
-                st.session_state['last_upload_result'] = ecg_model
-                st.session_state['upload_error'] = None
+            # CLEANUP FIX ✔✔✔
+            deployment_dir = os.path.join(os.getcwd(), "Deployment")
+            for f in os.listdir(deployment_dir):
+                if f.startswith("Scaled_1DLead_") and f.endswith(".csv"):
+                    try:
+                        os.remove(os.path.join(deployment_dir, f))
+                    except:
+                        pass
 
-                # show result (same styling as before)
-                if "Normal" in ecg_model:
-                    result_color = "#27ae60"; result_icon = "✅"
-                elif "Myocardial Infarction" in ecg_model:
-                    result_color = "#e74c3c"; result_icon = "⚠️"
-                elif "Abnormal Heartbeat" in ecg_model:
-                    result_color = "#f39c12"; result_icon = "🔔"
-                else:
-                    result_color = "#9b59b6"; result_icon = "📋"
+            progress.progress(20)
+            status.text("Loading image...")
+            img = ecg.getImage(saved_path)
 
-                st.markdown(f"""
-                <div style="background: {result_color}; padding: 30px; border-radius: 15px; 
-                            margin: 30px 0; text-align: center; color: white;">
-                    <h2 style="color: white; margin: 0 0 15px 0;">
-                        {result_icon} AI DIAGNOSIS RESULT
-                    </h2>
-                    <p style="font-size: 1.3em; margin: 0; font-weight: bold;">
-                        {ecg_model}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+            progress.progress(40)
+            status.text("Gray scaling...")
+            gray = ecg.GrayImgae(img)
 
-                # Save prediction to DB (optional)
-                try:
-                    preds = db['predictions']
-                    pred_doc = {
-                        'prediction_id': str(uuid.uuid4()),
-                        'user_email': st.session_state.get('email'),
-                        'prediction': str(ecg_model),
-                        'file_name': os.path.basename(saved_path),
-                        'timestamp': datetime.utcnow()
-                    }
-                    preds.insert_one(pred_doc)
-                    st.info('✅ Prediction saved to database')
-                except Exception as e:
-                    print("DB save failed:", e)
+            progress.progress(55)
+            status.text("Dividing leads...")
+            leads = ecg.DividingLeads(img)
 
-            except Exception as e:
-                tb = traceback.format_exc()
-                print("Processing error:\n", tb)
-                st.error("❌ An error occurred during processing. Full traceback below:")
-                st.code(tb, language="python")
-                st.session_state['upload_error'] = str(e)
-                st.session_state['last_upload_hash'] = None
-                st.session_state['last_upload_result'] = None
-            finally:
-                progress_bar.empty()
-                status_text.empty()
+            progress.progress(65)
+            status.text("Preprocessing leads...")
+            ecg.PreprocessingLeads(leads)
+
+            progress.progress(75)
+            status.text("Signal extraction...")
+            ecg.SignalExtraction_Scaling(leads)
+
+            progress.progress(82)
+            status.text("Combining signals...")
+            df1d = ecg.CombineConvert1Dsignal()
+
+            progress.progress(90)
+            status.text("Dimensionality reduction...")
+            final_df = ecg.DimensionalReduciton(df1d)
+
+            progress.progress(97)
+            status.text("Predicting...")
+            result = ecg.ModelLoad_predict(final_df)
+
+            progress.progress(100)
+            status.text("Done ✔")
+
+            st.session_state['last_upload_hash'] = file_hash
+            st.session_state['last_upload_result'] = result
+
+            st.success(result)
+
+            preds = db['predictions']
+            preds.insert_one({
+                "prediction_id": str(uuid.uuid4()),
+                "user_email": st.session_state['email'],
+                "prediction": result,
+                "file_name": os.path.basename(saved_path),
+                "timestamp": datetime.utcnow()
+            })
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            st.error("Processing failed ❌")
+            st.code(tb, language="python")
 
     else:
-        # your existing "how to use" block unchanged
-        st.markdown("""<div style="background: white; ...">...</div>""", unsafe_allow_html=True)
+        st.info("Upload an ECG image to begin.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
